@@ -1,4 +1,6 @@
 import News from "../models/news.model.js";
+import { uploadImage, deleteImage } from "../utils/cloudinary.js";
+import fs from "fs-extra";
 
 export const getNews = async (req, res) => {
   try {
@@ -27,11 +29,21 @@ export const getNew = async (req, res) => {
 export const createNews = async (req, res) => {
   try {
     const { author, title, content } = req.body;
+
     const news = new News({
       author,
       title,
       content,
     });
+
+    if (req.files?.image) {
+      const result = await uploadImage(req.files.image.tempFilePath);
+      news.image = {
+        public_id: result.public_id,
+        secure_url: result.secure_url,
+      };
+      await fs.unlink(req.files.image.tempFilePath);
+    }
     await news.save();
     res.json(news);
   } catch (error) {
@@ -60,6 +72,9 @@ export const deleteNews = async (req, res) => {
       return res.status(404).json({
         message: "News does not exists",
       });
+    if (news.image?.public_id) {
+      await deleteImage(news.image.public_id);
+    }
     return res.json(news);
   } catch (error) {
     return res.status(500).json({
